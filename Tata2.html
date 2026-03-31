@@ -1,0 +1,1539 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <title>✨ Partículas Mágicas — Sube tu Imagen</title>
+    <!-- Incluir Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;800&display=swap');
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #02000a;
+            font-family: 'Nunito', sans-serif;
+        }
+
+        canvas { display: block; }
+
+        /* =================== PANTALLA DE BIENVENIDA =================== */
+        #welcomeScreen {
+            position: fixed;
+            inset: 0;
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: radial-gradient(ellipse at 50% 40%, #120825 0%, #07010f 60%, #020008 100%);
+            transition: opacity 0.8s ease, visibility 0.8s ease;
+        }
+        #welcomeScreen.hidden {
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+        }
+
+        .welcome-card {
+            position: relative;
+            width: min(90vw, 520px);
+            padding: 50px 40px;
+            background: rgba(18, 10, 40, 0.55);
+            backdrop-filter: blur(30px) saturate(1.4);
+            -webkit-backdrop-filter: blur(30px) saturate(1.4);
+            border: 1px solid rgba(217, 160, 215, 0.25);
+            border-radius: 32px;
+            text-align: center;
+            color: #fff;
+            box-shadow:
+                0 0 80px rgba(160, 80, 200, 0.15),
+                0 0 160px rgba(100, 40, 180, 0.08),
+                inset 0 0 60px rgba(200, 120, 255, 0.03);
+            animation: cardFloat 4s ease-in-out infinite;
+        }
+        @keyframes cardFloat {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-8px); }
+        }
+
+        .welcome-card h1 {
+            font-size: 2rem;
+            font-weight: 800;
+            margin: 0 0 6px;
+            background: linear-gradient(135deg, #ffb6b9, #d9a0d7, #a78bfa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .welcome-card .subtitle {
+            font-size: 0.95rem;
+            color: rgba(255,255,255,0.55);
+            margin-bottom: 30px;
+            line-height: 1.5;
+        }
+
+        /* Zona Drag & Drop */
+        .drop-zone {
+            position: relative;
+            border: 2px dashed rgba(217, 160, 215, 0.35);
+            border-radius: 20px;
+            padding: 40px 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-bottom: 20px;
+            overflow: hidden;
+        }
+        .drop-zone::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: 20px;
+            background: radial-gradient(circle at 50% 50%, rgba(160, 80, 200, 0.06), transparent 70%);
+            transition: opacity 0.3s;
+        }
+        .drop-zone:hover, .drop-zone.dragover {
+            border-color: rgba(255, 182, 185, 0.7);
+            box-shadow: 0 0 40px rgba(217, 160, 215, 0.2);
+        }
+        .drop-zone:hover::before, .drop-zone.dragover::before {
+            opacity: 1;
+            background: radial-gradient(circle at 50% 50%, rgba(160, 80, 200, 0.15), transparent 70%);
+        }
+        .drop-zone .drop-icon {
+            font-size: 3rem;
+            margin-bottom: 10px;
+            display: block;
+            animation: iconPulse 2.5s ease-in-out infinite;
+        }
+        @keyframes iconPulse {
+            0%, 100% { transform: scale(1); filter: drop-shadow(0 0 8px rgba(255,182,185,0.4)); }
+            50% { transform: scale(1.08); filter: drop-shadow(0 0 16px rgba(255,182,185,0.7)); }
+        }
+        .drop-zone .drop-text {
+            font-size: 1rem;
+            color: rgba(255,255,255,0.7);
+            position: relative;
+        }
+        .drop-zone .drop-text strong {
+            color: #ffb6b9;
+        }
+
+        /* Preview de imagen seleccionada */
+        .image-preview {
+            display: none;
+            margin: 15px auto 0;
+            width: 120px;
+            height: 120px;
+            border-radius: 16px;
+            object-fit: contain;
+            border: 2px solid rgba(255,182,185,0.3);
+            box-shadow: 0 0 30px rgba(160,80,200,0.2);
+            animation: previewAppear 0.4s ease;
+        }
+        @keyframes previewAppear {
+            from { opacity: 0; transform: scale(0.8); }
+            to { opacity: 1; transform: scale(1); }
+        }
+        .image-preview.visible {
+            display: block;
+        }
+
+        /* Botón principal de iniciar */
+        .btn-start {
+            display: none;
+            margin: 20px auto 0;
+            padding: 14px 48px;
+            font-family: 'Nunito', sans-serif;
+            font-size: 1.1rem;
+            font-weight: 800;
+            color: #fff;
+            background: linear-gradient(135deg, #d946ef, #a855f7, #7c3aed);
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow:
+                0 4px 20px rgba(168, 85, 247, 0.4),
+                0 0 40px rgba(168, 85, 247, 0.15);
+            transition: all 0.3s ease;
+            animation: btnGlow 2s ease-in-out infinite alternate;
+        }
+        .btn-start.visible {
+            display: inline-block;
+        }
+        @keyframes btnGlow {
+            0% { box-shadow: 0 4px 20px rgba(168, 85, 247, 0.4), 0 0 40px rgba(168, 85, 247, 0.15); }
+            100% { box-shadow: 0 4px 30px rgba(217, 70, 239, 0.55), 0 0 60px rgba(168, 85, 247, 0.25); }
+        }
+        .btn-start:hover {
+            transform: translateY(-2px) scale(1.03);
+            box-shadow:
+                0 6px 30px rgba(168, 85, 247, 0.6),
+                0 0 60px rgba(168, 85, 247, 0.3);
+        }
+        .btn-start:active {
+            transform: translateY(0) scale(0.98);
+        }
+
+        /* Partículas decorativas de fondo en la welcome screen */
+        .bg-particle {
+            position: absolute;
+            width: 3px;
+            height: 3px;
+            border-radius: 50%;
+            background: rgba(217, 160, 215, 0.5);
+            pointer-events: none;
+            animation: floatParticle linear infinite;
+        }
+        @keyframes floatParticle {
+            0% { transform: translateY(0) scale(1); opacity: 0; }
+            10% { opacity: 1; }
+            90% { opacity: 1; }
+            100% { transform: translateY(-100vh) scale(0.3); opacity: 0; }
+        }
+
+        /* =================== CONTROLES FLOTANTES DERECHOS =================== */
+        #rightControls {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            z-index: 50;
+            display: none;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 15px;
+        }
+        #rightControls.visible {
+            display: flex;
+            animation: previewAppear 0.5s ease;
+        }
+
+        #floatBgToggle {
+            background: rgba(20, 15, 35, 0.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 182, 185, 0.3);
+            border-radius: 25px;
+            padding: 10px 18px;
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+            box-shadow: 0 0 20px rgba(217, 160, 215, 0.2);
+            transition: all 0.3s ease;
+        }
+        #floatBgToggle:hover {
+            background: rgba(30, 20, 50, 0.9);
+            border-color: rgba(255, 182, 185, 0.8);
+            transform: scale(1.05);
+        }
+        #floatBgToggle input {
+            accent-color: #d946ef;
+            cursor: pointer;
+            width: 16px;
+            height: 16px;
+        }
+
+        #btnChangeImage {
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            border: 1px solid rgba(255, 182, 185, 0.3);
+            background: rgba(20, 15, 35, 0.6);
+            backdrop-filter: blur(12px);
+            color: #ffb6b9;
+            font-size: 1.5rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 0 20px rgba(217, 160, 215, 0.2);
+            transition: all 0.3s ease;
+        }
+        #btnChangeImage:hover {
+            transform: scale(1.1) rotate(15deg);
+            box-shadow: 0 0 35px rgba(217, 160, 215, 0.5);
+            border-color: rgba(255, 182, 185, 0.6);
+        }
+
+        /* =================== OVERLAY DE TEXTO (Ya existente pero mantenido) =================== */
+        #messageOverlay {
+            position: absolute;
+            top: 12%;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #ffffff;
+            font-size: 2.5rem;
+            text-align: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.8s ease-in-out;
+            text-shadow:
+                0 0 10px #ffb6b9,
+                0 0 20px #ffb6b9,
+                0 0 40px #d9a0d7,
+                0 0 80px #d9a0d7;
+            z-index: 10;
+        }
+
+        /* =================== REPRODUCTOR DE MÚSICA BTS =================== */
+        #musicPlayerWrapper {
+            position: absolute;
+            bottom: 30px;
+            left: 30px;
+            z-index: 20;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            width: 300px;
+        }
+        #musicPlayer {
+            background: rgba(20, 15, 35, 0.6);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 182, 185, 0.3);
+            border-radius: 20px;
+            padding: 15px 25px;
+            color: white;
+            box-shadow: 0 0 20px rgba(217, 160, 215, 0.2);
+            transition: all 0.3s ease;
+            cursor: pointer;
+            overflow: hidden;
+        }
+        #musicPlayer:hover {
+            box-shadow: 0 0 30px rgba(217, 160, 215, 0.5);
+            background: rgba(30, 20, 50, 0.7);
+        }
+        .player-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+        }
+        .song-info {
+            flex-grow: 1;
+            overflow: hidden;
+        }
+        .song-title {
+            font-size: 1rem;
+            text-shadow: 0 0 5px #ffb6b9;
+            margin: 0;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .album-title {
+            font-size: 0.75rem;
+            color: #d9a0d7;
+            margin: 0;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .btn-icon {
+            background: none;
+            border: none;
+            color: #ffb6b9;
+            font-size: 1.2rem;
+            cursor: pointer;
+            transition: transform 0.2s;
+            outline: none;
+        }
+        .btn-icon:hover {
+            transform: scale(1.2);
+            text-shadow: 0 0 10px #ffb6b9;
+        }
+        .player-body {
+            max-height: 0;
+            opacity: 0;
+            transition: max-height 0.4s ease, opacity 0.3s ease, margin-top 0.3s ease;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        #musicPlayer.expanded .player-body {
+            max-height: 150px;
+            opacity: 1;
+            margin-top: 15px;
+        }
+        .progress-container {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.8rem;
+            color: #d9a0d7;
+            margin-bottom: 15px;
+        }
+        input[type=range] {
+            -webkit-appearance: none;
+            appearance: none;
+            flex-grow: 1;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 2px;
+            outline: none;
+            cursor: pointer;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 12px;
+            height: 12px;
+            background: #ffb6b9;
+            border-radius: 50%;
+            box-shadow: 0 0 10px #ffb6b9;
+        }
+        .controls {
+            display: flex;
+            gap: 20px;
+        }
+        .controls button {
+            background: none;
+            border: none;
+            color: #d9a0d7;
+            font-size: 1.5rem;
+            cursor: pointer;
+            transition: transform 0.2s, color 0.2s;
+            text-shadow: 0 0 10px #d9a0d7;
+            padding: 0;
+            outline: none;
+        }
+        .controls button:hover {
+            transform: scale(1.2);
+            color: #ffb6b9;
+            text-shadow: 0 0 15px #ffb6b9;
+        }
+        #playlistPanel {
+            background: rgba(20, 15, 35, 0.6);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 182, 185, 0.3);
+            border-radius: 15px;
+            max-height: 0;
+            overflow-y: auto;
+            transition: max-height 0.4s ease, padding 0.4s ease, border 0.4s ease;
+            padding: 0 15px;
+            border-color: transparent;
+        }
+        #playlistPanel.open {
+            max-height: 350px;
+            padding: 15px;
+            border-color: rgba(255, 182, 185, 0.3);
+        }
+        .search-container {
+            position: sticky;
+            top: 0;
+            background: rgba(20, 15, 35, 0.95);
+            padding-bottom: 10px;
+            z-index: 5;
+            margin-bottom: 5px;
+            display: flex;
+            align-items: center;
+        }
+        .search-container input {
+            width: 100%;
+            padding: 10px 14px;
+            border-radius: 8px;
+            border: 1px solid rgba(217, 160, 215, 0.4);
+            background: rgba(10, 5, 20, 0.8);
+            color: #fff;
+            font-family: inherit;
+            font-size: 0.95rem;
+            outline: none;
+            transition: all 0.3s ease;
+        }
+        .search-container input:focus {
+            border-color: #ffb6b9;
+            box-shadow: 0 0 10px rgba(255, 182, 185, 0.3);
+        }
+        .search-container input::placeholder {
+            color: rgba(255,255,255,0.4);
+        }
+        .playlist-album { margin-bottom: 10px; }
+        .album-header {
+            padding: 8px 10px;
+            background: rgba(217, 160, 215, 0.1);
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            color: #ffb6b9;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: background 0.2s;
+            font-weight: bold;
+        }
+        .album-header:hover { background: rgba(217, 160, 215, 0.3); }
+        .album-songs {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+            padding-left: 10px;
+        }
+        .album-songs.open { max-height: 200px; }
+        .song-item {
+            padding: 8px 10px;
+            font-size: 0.8rem;
+            color: #e0e0e0;
+            cursor: pointer;
+            border-radius: 5px;
+            transition: background 0.2s, color 0.2s;
+            margin-top: 2px;
+        }
+        .song-item:hover, .song-item.active {
+            background: rgba(255, 182, 185, 0.2);
+            color: #fff;
+        }
+        #yt-container {
+            position: absolute;
+            left: -9999px;
+            width: 1px;
+            height: 1px;
+        }
+        .audio-wave {
+            display: flex;
+            gap: 3px;
+            height: 15px;
+            align-items: flex-end;
+        }
+        .audio-wave span {
+            display: block;
+            width: 3px;
+            height: 100%;
+            background: #ffb6b9;
+            border-radius: 3px;
+            animation: wave 1s infinite alternate ease-in-out;
+            box-shadow: 0 0 5px #ffb6b9;
+            opacity: 0.5;
+        }
+        .audio-wave.playing span { opacity: 1; }
+        .audio-wave.playing span:nth-child(1) { animation-delay: 0.0s; }
+        .audio-wave.playing span:nth-child(2) { animation-delay: 0.2s; }
+        .audio-wave.playing span:nth-child(3) { animation-delay: 0.4s; }
+        .audio-wave.playing span:nth-child(4) { animation-delay: 0.1s; }
+        .audio-wave.playing span:nth-child(5) { animation-delay: 0.3s; }
+        .audio-wave:not(.playing) span {
+            animation: none;
+            height: 3px;
+        }
+        @keyframes wave {
+            0% { height: 3px; }
+            100% { height: 100%; }
+        }
+        #playlistPanel::-webkit-scrollbar { width: 6px; }
+        #playlistPanel::-webkit-scrollbar-thumb {
+            background-color: rgba(217, 160, 215, 0.5);
+            border-radius: 10px;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- =================== PANTALLA DE BIENVENIDA =================== -->
+    <div id="welcomeScreen">
+        <div class="welcome-card">
+            <h1>✨ Partículas Mágicas</h1>
+            <p class="subtitle">Sube cualquier imagen y mírala cobrar vida<br>como miles de partículas luminosas 💜</p>
+
+            <div class="drop-zone" id="dropZone">
+                <span class="drop-icon">🖼️</span>
+                <p class="drop-text">Arrastra tu imagen aquí<br>o <strong>haz clic para seleccionar</strong></p>
+            </div>
+
+            <img class="image-preview" id="imagePreview" alt="Vista previa">
+            <button class="btn-start" id="btnStart">🚀 ¡Iniciar Magia!</button>
+        </div>
+    </div>
+
+    <!-- Controles flotantes esquina inferior derecha -->
+    <div id="rightControls">
+        <label id="floatBgToggle" title="Ocultar fondos claros genéricos si la imagen no tiene transparencia">
+            <input type="checkbox" id="chkRemoveBgFloat">
+            <span>Quitar fondo blanco</span>
+        </label>
+        <button id="btnChangeImage" title="Cambiar imagen">🖼️</button>
+    </div>
+    <input type="file" id="hiddenFileInput" accept="image/*" style="display:none">
+
+    <div id="messageOverlay">I Purple You! 💜</div>
+    
+    <!-- Reproductor de YouTube de BTS Reactivo & Acordeón -->
+    <div id="musicPlayerWrapper">
+        <!-- Reproductor Principal -->
+        <div id="musicPlayer">
+            <div class="player-header" id="playerHeader">
+                <div class="audio-wave" id="audioWave">
+                    <span></span><span></span><span></span><span></span><span></span>
+                </div>
+                <div class="song-info">
+                    <p class="song-title" id="songTitle">Cargando...</p>
+                    <p class="album-title" id="albumTitle">Iniciando sistema...</p>
+                </div>
+                <button id="btnTogglePlaylist" class="btn-icon" title="Abrir Discos">🗂️</button>
+            </div>
+            
+            <div class="player-body">
+                <div class="progress-container">
+                    <span id="currentTime">0:00</span>
+                    <input type="range" id="progressBar" min="0" max="100" value="0">
+                    <span id="durationTime">0:00</span>
+                </div>
+                <div class="controls">
+                    <button id="btnPrev">⏮</button>
+                    <button id="btnPlayPause">▶</button>
+                    <button id="btnNext">⏭</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Panel de Álbumes (Plegable, con buscador global) -->
+        <div id="playlistPanel">
+            <div class="search-container" style="flex-direction: column; align-items: flex-start;">
+                <input type="text" id="songSearchInput" placeholder="🔍 Filtrar local o [Enter] para buscar en nube..." autocomplete="off">
+                <small style="font-size: 0.65rem; color: rgba(255,255,255,0.4); margin-top: 5px;">* Presiona [Enter] para consultar cualquier canción en YouTube</small>
+            </div>
+            <div id="playlistContent">
+                <!-- Renderizado dinámico desde JS -->
+            </div>
+        </div>
+    </div>
+    <div id="yt-container"></div>
+
+    <div id="webgl-container"></div>
+
+    <script>
+        // 👉 CLAVE DE YOUTUBE PARA BUSCADOR GLOBAL (OPCIÓN 1)
+        // Crea un proyecto en Google Cloud Console, habilita "YouTube Data API v3", crea credenciales (API Key) y pégala aquí:
+        const YOUTUBE_API_KEY = "AIzaSyAbMPPInnxmr1Zi68cA7Yx6lVtUMZAeLI0"; 
+        
+        // ===== SISTEMA DE MÚSICA BTS =====
+        // IMPORTANTE: Los videos oficiales de HYBE bloquean la reproducción fuera de YouTube.
+        // Para que suenen, debes buscar en YouTube versiones de fans (ej. "BTS Dynamite Color Coded Lyrics")
+        // y reemplazar el valor de 'id' (las 11 letras que van después del "v=" en la URL).
+        const btsAlbums = [
+            {
+                name: "BE",
+                songs: [
+                    { title: "Dynamite", id: "gdZLi9oWNZg" }, // <-- CAMBIA ESTE ID
+                    { title: "Life Goes On", id: "-5q5mZbe3V8" }
+                ]
+            },
+            {
+                name: "Map of the Soul: 7 / Persona",
+                songs: [
+                    { title: "ON", id: "mPVDGOVjRQ0" }, // <-- CAMBIA ESTE ID
+                    { title: "Black Swan", id: "0lapF4DQPKQ" },
+                    { title: "Boy With Luv", id: "XsX3ATc3FbA" },
+                    { title: "Mikrokosmos", id: "b0Vq8DXGo1c" }
+                ]
+            },
+            {
+                name: "Love Yourself: Tear",
+                songs: [
+                    { title: "Fake Love", id: "7C2z4GqqS5E" },
+                    { title: "The Truth Untold", id: "8JVjA_4bwcE" }
+                ]
+            },
+            {
+                name: "Wings / YNWA",
+                songs: [
+                    { title: "Blood Sweat & Tears", id: "hmE9f_RZAsw" },
+                    { title: "Spring Day", id: "xEeFrLSkMm8" }
+                ]
+            },
+            {
+                name: "Singles Clásicos",
+                songs: [
+                    { title: "Butter", id: "WMweEpGlu_U" },
+                    { title: "Mic Drop", id: "kTlv5_Bs8aw" },
+                    { title: "DNA", id: "MBdVXkSdbc8" } // <-- CAMBIA ESTE ID
+                ]
+            }
+        ];
+
+        let currentAlbumIndex = 0;
+        let currentSongIndex = 0;
+        let ytPlayer;
+        let isMusicPlaying = false;
+        let hasMusicStarted = false;
+        let progressInterval;
+
+        // Cargar API de YouTube
+        const tag = document.createElement('script');
+        tag.src = "https://www.youtube.com/iframe_api";
+        const firstScriptTag = document.getElementsByTagName('script')[0];
+        if (firstScriptTag) {
+            firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+        } else {
+            document.head.appendChild(tag);
+        }
+
+        // Renderizar el Menú Acordeón en el HTML
+        function renderPlaylistMenu() {
+            const panel = document.getElementById('playlistContent');
+            panel.innerHTML = ''; // Limpiar
+            
+            btsAlbums.forEach((album, aIndex) => {
+                const albumDiv = document.createElement('div');
+                albumDiv.className = 'playlist-album';
+                
+                // Cabecera del Álbum
+                const header = document.createElement('div');
+                header.className = 'album-header';
+                header.innerHTML = `<span>💿 ${album.name}</span> <span class="arrow">▼</span>`;
+                
+                // Contenedor de canciones
+                const songsContainer = document.createElement('div');
+                songsContainer.className = 'album-songs';
+                
+                album.songs.forEach((song, sIndex) => {
+                    const songDiv = document.createElement('div');
+                    songDiv.className = 'song-item';
+                    songDiv.id = `song-${aIndex}-${sIndex}`;
+                    songDiv.textContent = `${sIndex + 1}. ${song.title}`;
+                    
+                    songDiv.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        playSpecificSong(aIndex, sIndex);
+                    });
+                    
+                    songsContainer.appendChild(songDiv);
+                });
+                
+                header.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    songsContainer.classList.toggle('open');
+                });
+                
+                albumDiv.appendChild(header);
+                albumDiv.appendChild(songsContainer);
+                panel.appendChild(albumDiv);
+            });
+
+        }
+
+        // ================= SISTEMA DE BÚSQUEDA =================
+
+        function decodeHTMLEntities(text) {
+            let textArea = document.createElement('textarea');
+            textArea.innerHTML = text;
+            return textArea.value;
+        }
+
+        // 1. Buscador Global Asíncrono en YouTube (Gatillado con Enter)
+        async function searchGlobalYouTube(query) {
+            if (YOUTUBE_API_KEY === "TU_API_KEY_AQUI") {
+                alert("⚠️ Para que el buscador global funcione, necesitas colocar tu API Key de YouTube en la línea 573 del código.");
+                return;
+            }
+
+            const searchInput = document.getElementById('songSearchInput');
+            const originalVal = searchInput.value;
+            searchInput.value = "Conectando con YouTube... 🌌";
+            searchInput.disabled = true;
+
+            try {
+                const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(query)}&key=${YOUTUBE_API_KEY}&type=video&maxResults=15`;
+                const response = await fetch(url);
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    alert("Error conectando a YouTube. Revisa si tu API Key es correcta. Detalle: " + (data.error ? data.error.message : response.status));
+                    return;
+                }
+
+                // Si ya había una búsqueda anterior, la borramos para no acumular basura
+                if (btsAlbums[btsAlbums.length - 1].name === "🌐 Búsqueda en YouTube") {
+                    btsAlbums.pop();
+                }
+
+                let newAlbum = {
+                    name: "🌐 Búsqueda en YouTube",
+                    songs: []
+                };
+
+                data.items.forEach(item => {
+                    newAlbum.songs.push({
+                        title: decodeHTMLEntities(item.snippet.title),
+                        id: item.id.videoId
+                    });
+                });
+
+                if (newAlbum.songs.length === 0) {
+                    alert("No se encontraron resultados en YouTube para: " + query);
+                } else {
+                    // Agregar el disco especial temporal al final de la playlist
+                    btsAlbums.push(newAlbum);
+                    renderPlaylistMenu(); // Regeneramos la interfaz con la novedad
+                    
+                    // Aseguramos forzar apertura de la última carpeta creada (la de búsqueda)
+                    const albumsDivs = document.querySelectorAll('.playlist-album');
+                    const lastAlbum = albumsDivs[albumsDivs.length - 1];
+                    const songsCont = lastAlbum.querySelector('.album-songs');
+                    songsCont.classList.add('open');
+                    songsCont.style.maxHeight = '2000px';
+
+                    // Ocultamos manualemente los discos anteriores para asemejar un entorno de filtro nativo
+                    for(let i=0; i<albumsDivs.length-1; i++){
+                        albumsDivs[i].style.display = 'none';
+                    }
+                }
+            } catch(err) {
+                alert("Error de red al intentar consultar a YouTube.");
+            } finally {
+                if (searchInput) {
+                    searchInput.disabled = false;
+                    searchInput.value = originalVal;
+                }
+            }
+        }
+
+        // 2. Filtro Local Instantáneo (Al teclear sin presionar Enter)
+        document.getElementById('songSearchInput').addEventListener('input', function(e) {
+            const query = e.target.value.toLowerCase().trim();
+            const albumsDivs = document.querySelectorAll('.playlist-album');
+            
+            albumsDivs.forEach(albumDiv => {
+                const songsContainer = albumDiv.querySelector('.album-songs');
+                const songs = songsContainer.querySelectorAll('.song-item');
+                const albumTitleText = albumDiv.querySelector('.album-header span').textContent.toLowerCase();
+                const albumTitleMatch = albumTitleText.includes(query);
+                
+                let visibleSongs = 0;
+                
+                songs.forEach(songDiv => {
+                    if (songDiv.textContent.toLowerCase().includes(query) || albumTitleMatch) {
+                        songDiv.style.display = 'block';
+                        visibleSongs++;
+                    } else {
+                        songDiv.style.display = 'none';
+                    }
+                });
+                
+                if (visibleSongs > 0 || albumTitleMatch) {
+                    albumDiv.style.display = 'block';
+                    if (query !== '') {
+                        songsContainer.style.maxHeight = '2000px';
+                    } else {
+                        songsContainer.style.maxHeight = '';
+                    }
+                } else {
+                    albumDiv.style.display = 'none';
+                }
+            });
+        });
+
+        // 3. Gatillo para lanzar la búsqueda externa en la nube
+        document.getElementById('songSearchInput').addEventListener('keydown', function(e) {
+            if(e.key === 'Enter') {
+                const query = e.target.value.trim();
+                if(query !== "") {
+                    // Si el panel de discos estaba cerrado, obligamos a que se abra porque habrá magia.
+                    const playlistPanel = document.getElementById('playlistPanel');
+                    if (!playlistPanel.classList.contains('open')) {
+                        playlistPanel.classList.add('open');
+                    }
+                    searchGlobalYouTube(query);
+                }
+            }
+        });
+
+        function onYouTubeIframeAPIReady() {
+            ytPlayer = new YT.Player('yt-container', {
+                height: '10',
+                width: '10',
+                videoId: btsAlbums[currentAlbumIndex].songs[currentSongIndex].id,
+                playerVars: {
+                    'playsinline': 1,
+                    'controls': 0,
+                    'disablekb': 1,
+                    'origin': window.location.protocol === 'file:' ? 'https://www.youtube.com' : window.location.origin
+                },
+                events: {
+                    'onReady': onPlayerReady,
+                    'onStateChange': onPlayerStateChange,
+                    'onError': onPlayerError
+                }
+            });
+        }
+
+        function onPlayerError(event) {
+            console.error("Error en el reproductor de YT (Código: " + event.data + "). Saltando canción...");
+            playNextSong();
+        }
+
+        function onPlayerReady(event) {
+            updatePlayerUI();
+            renderPlaylistMenu();
+        }
+
+        function updatePlayerUI() {
+            const currentObj = btsAlbums[currentAlbumIndex].songs[currentSongIndex];
+            document.getElementById('songTitle').textContent = currentObj.title;
+            document.getElementById('albumTitle').textContent = btsAlbums[currentAlbumIndex].name;
+            
+            // Marcar canción activa en el menú
+            document.querySelectorAll('.song-item').forEach(el => el.classList.remove('active'));
+            const activeEl = document.getElementById(`song-${currentAlbumIndex}-${currentSongIndex}`);
+            if(activeEl) activeEl.classList.add('active');
+            
+            // Si la canción arranca y estaba oculta su categoría, abrirla
+            if(activeEl && activeEl.parentElement && !activeEl.parentElement.classList.contains('open')) {
+                activeEl.parentElement.classList.add('open');
+            }
+        }
+
+        function playSpecificSong(aIndex, sIndex) {
+            currentAlbumIndex = aIndex;
+            currentSongIndex = sIndex;
+            if (ytPlayer && ytPlayer.loadVideoById) {
+                ytPlayer.loadVideoById(btsAlbums[currentAlbumIndex].songs[currentSongIndex].id);
+                updatePlayerUI();
+                hasMusicStarted = true;
+            }
+        }
+
+        function onPlayerStateChange(event) {
+            if (event.data === YT.PlayerState.PLAYING) {
+                isMusicPlaying = true;
+                document.getElementById('btnPlayPause').textContent = "⏸";
+                document.getElementById('audioWave').classList.add('playing');
+                updatePlayerUI();
+                startProgressBar();
+            } else {
+                isMusicPlaying = false;
+                document.getElementById('btnPlayPause').textContent = "▶";
+                document.getElementById('audioWave').classList.remove('playing');
+                stopProgressBar();
+                
+                if (event.data === YT.PlayerState.ENDED) {
+                    playNextSong();
+                }
+            }
+        }
+
+        function playNextSong() {
+            const albumObj = btsAlbums[currentAlbumIndex];
+            if (currentSongIndex + 1 < albumObj.songs.length) {
+                currentSongIndex++;
+            } else {
+                // Siguiente álbum
+                currentAlbumIndex = (currentAlbumIndex + 1) % btsAlbums.length;
+                currentSongIndex = 0;
+            }
+            playSpecificSong(currentAlbumIndex, currentSongIndex);
+        }
+
+        function playPrevSong() {
+            if (currentSongIndex > 0) {
+                currentSongIndex--;
+            } else {
+                // Álbum anterior
+                currentAlbumIndex = (currentAlbumIndex - 1 + btsAlbums.length) % btsAlbums.length;
+                currentSongIndex = btsAlbums[currentAlbumIndex].songs.length - 1;
+            }
+            playSpecificSong(currentAlbumIndex, currentSongIndex);
+        }
+
+        function togglePlayPause() {
+            if (!ytPlayer || !ytPlayer.getPlayerState) return;
+            hasMusicStarted = true; 
+            
+            if (isMusicPlaying) {
+                ytPlayer.pauseVideo();
+            } else {
+                ytPlayer.playVideo();
+            }
+        }
+
+        // --- SISTEMA DE BARRA DE PROGRESO ---
+        function formatTime(seconds) {
+            if (!seconds || isNaN(seconds)) return "0:00";
+            const m = Math.floor(seconds / 60);
+            const s = Math.floor(seconds % 60);
+            return `${m}:${s < 10 ? '0' : ''}${s}`;
+        }
+
+        function startProgressBar() {
+            stopProgressBar();
+            progressInterval = setInterval(() => {
+                if (ytPlayer && ytPlayer.getCurrentTime && isMusicPlaying) {
+                    const currentTime = ytPlayer.getCurrentTime();
+                    const duration = ytPlayer.getDuration();
+                    
+                    document.getElementById('currentTime').textContent = formatTime(currentTime);
+                    document.getElementById('durationTime').textContent = formatTime(duration);
+                    
+                    if (duration > 0 && !isDraggingProgressBar) {
+                        const val = (currentTime / duration) * 100;
+                        document.getElementById('progressBar').value = val;
+                    }
+                }
+            }, 1000);
+        }
+
+        function stopProgressBar() {
+            if(progressInterval) clearInterval(progressInterval);
+        }
+
+        let isDraggingProgressBar = false;
+
+        window.addEventListener('DOMContentLoaded', () => {
+            // Controles de Música
+            document.getElementById('btnPlayPause').addEventListener('click', (e) => {
+                e.stopPropagation(); togglePlayPause();
+            });
+            document.getElementById('btnNext').addEventListener('click', (e) => {
+                e.stopPropagation(); playNextSong();
+            });
+            document.getElementById('btnPrev').addEventListener('click', (e) => {
+                e.stopPropagation(); playPrevSong();
+            });
+            
+            // Animación de Expansión del propio reproductor
+            document.getElementById('musicPlayer').addEventListener('click', (e) => {
+                e.stopPropagation(); 
+                document.getElementById('musicPlayer').classList.toggle('expanded');
+            });
+            
+            // Botón de abrir/cerrar playlist
+            document.getElementById('btnTogglePlaylist').addEventListener('click', (e) => {
+                e.stopPropagation();
+                document.getElementById('playlistPanel').classList.toggle('open');
+            });
+            
+            // Interacción táctil/mouse con la barra de progreso
+            const progressBar = document.getElementById('progressBar');
+            progressBar.addEventListener('click', (e) => e.stopPropagation());
+            progressBar.addEventListener('mousedown', (e) => { isDraggingProgressBar = true; e.stopPropagation(); });
+            progressBar.addEventListener('mouseup', (e) => {
+                isDraggingProgressBar = false;
+                if (ytPlayer && ytPlayer.getDuration) {
+                    const newTime = (progressBar.value / 100) * ytPlayer.getDuration();
+                    ytPlayer.seekTo(newTime, true);
+                }
+                e.stopPropagation();
+            });
+            progressBar.addEventListener('input', (e) => {
+                if (ytPlayer && ytPlayer.getDuration) {
+                    document.getElementById('currentTime').textContent = formatTime((progressBar.value / 100) * ytPlayer.getDuration());
+                }
+            });
+
+            // Evitar detonar partículas del canvas
+            document.getElementById('musicPlayerWrapper').addEventListener('click', (e) => e.stopPropagation());
+            document.getElementById('musicPlayerWrapper').addEventListener('touchstart', (e) => e.stopPropagation());
+        });
+        // ===== FIN SISTEMA DE MÚSICA =====
+
+        // ==========================================
+        // MOTOR GRÁFICO WEBGL (THREE.JS) - TATA 3D
+        // ==========================================
+        const container = document.getElementById('webgl-container');
+        let scene, camera, renderer;
+        
+        let neonGeometry, darkGeometry;
+        let neonPoints, darkPoints;
+
+        let neonBasePos, neonCurrentPos, neonVelocities, neonData; 
+        let darkBasePos, darkCurrentPos, darkVelocities, darkData;
+
+        const maxOrganicRadius = 60; // Radio del pincel agilizado y reducido al 40% para difuminar
+        const mouseObj = { x: -9999, y: -9999, isMoving: false };
+        let isExploding = false;
+        let explosionTime = 0;
+        
+        const msgOverlay = document.getElementById('messageOverlay');
+        let msgTimeoutId = null;
+        let hideTimeoutId = null;
+
+        const tataPhrases = [
+            "I Purple You! 💜",
+            "¡Hola Terrestre! 👽",
+            "BT21 te saluda ✨",
+            "Borahe 🌌",
+            "Explosión 3D de Amor 💕",
+            "¡Amor Intergaláctico! 🚀"
+        ];
+
+        function initWebGL() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x05050c);
+
+            const width = window.innerWidth;
+            const height = window.innerHeight;
+            
+            // Cámara Ortográfica para un Front-facing pixel perfect, pero permitiendo volumen en Z
+            camera = new THREE.OrthographicCamera(width / -2, width / 2, height / 2, height / -2, -2000, 2000);
+            camera.position.z = 1000;
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(width, height);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            // El canvas 3D se ubica en el fondo
+            renderer.domElement.style.position = 'absolute';
+            renderer.domElement.style.top = '0';
+            renderer.domElement.style.left = '0';
+            renderer.domElement.style.zIndex = '1'; 
+            container.appendChild(renderer.domElement);
+
+            let resizeTimeout;
+            window.addEventListener('resize', () => {
+                const w = window.innerWidth;
+                const h = window.innerHeight;
+                camera.left = w / -2;
+                camera.right = w / 2;
+                camera.top = h / 2;
+                camera.bottom = h / -2;
+                camera.updateProjectionMatrix();
+                renderer.setSize(w, h);
+                
+                // Evitar parpadeos recargando en cada pixel que se mueve. Solo al terminar.
+                clearTimeout(resizeTimeout);
+                resizeTimeout = setTimeout(() => {
+                    if (imageLoaded) loadParticlesFromImage();
+                }, 500);
+            });
+
+            // ZOOM SUAVE DE LA IMAGEN MÁGICA (SIN AFECTAR A LA INTERFAZ)
+            renderer.domElement.addEventListener('wheel', (e) => {
+                e.preventDefault();
+                camera.zoom += e.deltaY * -0.0015; // Velocidad de zoom
+                camera.zoom = Math.max(0.3, Math.min(camera.zoom, 5)); // limites de zoom
+                camera.updateProjectionMatrix();
+            }, { passive: false });
+
+            let initialPinchDist = null;
+            let initialZoom = 1;
+
+            renderer.domElement.addEventListener('click', triggerLoveExplosion);
+            
+            renderer.domElement.addEventListener('touchstart', (e) => {
+                if (e.touches.length === 2) {
+                    let dx = e.touches[0].clientX - e.touches[1].clientX;
+                    let dy = e.touches[0].clientY - e.touches[1].clientY;
+                    initialPinchDist = Math.hypot(dx, dy);
+                    initialZoom = camera.zoom;
+                } else if (e.touches.length === 1) {
+                    triggerLoveExplosion(e.touches[0]);
+                }
+            });
+
+            // Mapeo perfecto del ratón sin importar qué tan cerca esté el zoom
+            renderer.domElement.addEventListener('mousemove', e => {
+                mouseObj.x = (e.clientX - window.innerWidth / 2) / camera.zoom;
+                mouseObj.y = -(e.clientY - window.innerHeight / 2) / camera.zoom;
+            });
+
+            renderer.domElement.addEventListener('touchmove', e => {
+                if (e.touches.length === 2 && initialPinchDist) {
+                    e.preventDefault();
+                    let dx = e.touches[0].clientX - e.touches[1].clientX;
+                    let dy = e.touches[0].clientY - e.touches[1].clientY;
+                    let dist = Math.hypot(dx, dy);
+                    camera.zoom = initialZoom * (dist / initialPinchDist);
+                    camera.zoom = Math.max(0.3, Math.min(camera.zoom, 5));
+                    camera.updateProjectionMatrix();
+                } else if (e.touches.length === 1) {
+                    mouseObj.x = (e.touches[0].clientX - window.innerWidth / 2) / camera.zoom;
+                    mouseObj.y = -(e.touches[0].clientY - window.innerHeight / 2) / camera.zoom;
+                }
+            }, { passive: false });
+        }
+
+        function triggerLoveExplosion(e) {
+            if (!hasMusicStarted && ytPlayer && ytPlayer.playVideo) {
+                hasMusicStarted = true;
+                ytPlayer.playVideo();
+            }
+
+            isExploding = true;
+            explosionTime = Date.now();
+            
+            msgOverlay.style.opacity = '0';
+            clearTimeout(msgTimeoutId);
+            clearTimeout(hideTimeoutId);
+
+            msgTimeoutId = setTimeout(() => {
+                msgOverlay.textContent = tataPhrases[Math.floor(Math.random() * tataPhrases.length)];
+                msgOverlay.style.opacity = '1'; 
+                hideTimeoutId = setTimeout(() => { msgOverlay.style.opacity = '0'; }, 3000);
+            }, 6000); // Aparece cuando Tata casi termina de reconstruirse
+
+            // Coordenadas mundiales WebGL considerando el nivel de zoom actual
+            let rawX = e.clientX || (e.touches && e.touches.length > 0 ? e.touches[0].clientX : window.innerWidth/2);
+            let rawY = e.clientY || (e.touches && e.touches.length > 0 ? e.touches[0].clientY : window.innerHeight/2);
+            let cx = (rawX - window.innerWidth/2) / camera.zoom;
+            let cy = -(rawY - window.innerHeight/2) / camera.zoom;
+
+            applyExplosion(neonCurrentPos, neonVelocities, cx, cy);
+            applyExplosion(darkCurrentPos, darkVelocities, cx, cy); // Ojos también explotan
+        }
+
+        function applyExplosion(positions, velocities, cx, cy) {
+            if(!positions) return;
+            const count = positions.length / 3;
+            for(let i=0; i<count; i++) {
+                let dx = positions[i*3] - cx;
+                let dy = positions[i*3+1] - cy;
+                let dist = Math.sqrt(dx*dx + dy*dy);
+                if (dist === 0) dist = 1;
+
+                // FÍSICA 3D: Dispersión contenida en pantalla visible
+                let force = (Math.random() * 40 + 20) / (dist * 0.008 + 1);
+                velocities[i*3] = (dx / dist) * force;
+                velocities[i*3+1] = (dy / dist) * force;
+                velocities[i*3+2] = (Math.random() - 0.5) * force * 1.5;
+            }
+        }
+
+        const sourceImage = new Image();
+        let imageLoaded = false;
+
+        function loadParticlesFromImage() {
+            if (!imageLoaded) return;
+            
+            // Limpiar memoria de geometría anterior
+            if(neonPoints) scene.remove(neonPoints);
+            if(darkPoints) scene.remove(darkPoints);
+
+            const offCanvas = document.createElement('canvas');
+            const offCtx = offCanvas.getContext('2d', { willReadFrequently: true });
+
+            // Aumentado a 0.96 para ocupar un espacio inmersivo en pantalla
+            let scale = Math.min((window.innerWidth * 0.96) / sourceImage.width, (window.innerHeight * 0.96) / sourceImage.height);
+
+            // 🔥 DENSIDAD MÁXIMA — cada píxel es una luciérnaga
+            const gap = 1; 
+            const MAX_RESOL = 600;
+            let rawW = sourceImage.width * scale;
+            let rawH = sourceImage.height * scale;
+            
+            if (rawW > MAX_RESOL || rawH > MAX_RESOL) {
+                let lim = Math.min(MAX_RESOL / rawW, MAX_RESOL / rawH);
+                rawW *= lim; rawH *= lim;
+            }
+            
+            let renderWidth = Math.floor(rawW);
+            let renderHeight = Math.floor(rawH);
+
+            offCanvas.width = renderWidth;
+            offCanvas.height = renderHeight;
+            offCtx.drawImage(sourceImage, 0, 0, renderWidth, renderHeight);
+
+            let imageData;
+            try {
+                imageData = offCtx.getImageData(0, 0, renderWidth, renderHeight);
+            } catch (e) {
+                alert("Bloqueo de seguridad CORS. Usa Live Server desde VSCode.");
+                return;
+            }
+
+            const pixels = imageData.data;
+            const startX = -renderWidth / 2;
+            const startY = renderHeight / 2;
+
+            let neonArray = [];
+            let darkArray = [];
+
+            for (let y = 0; y < renderHeight; y += gap) {
+                for (let x = 0; x < renderWidth; x += gap) {
+                    const index = (y * renderWidth + x) * 4;
+                    const r = pixels[index];
+                    const g = pixels[index+1];
+                    const b = pixels[index+2];
+                    const a = pixels[index+3];
+
+                    if (a > 128) { // Canal Alpha detectado
+                        const removeBg = document.getElementById('chkRemoveBgFloat').checked;
+                        if (removeBg && r > 200 && g > 165 && b > 150) continue; // Destila fondos claros opcionalmente
+                        
+                        const brightness = (r+g+b)/3;
+                        const isDark = brightness < 45;
+
+                        // Posición Dinámica (Efecto formándose) — igual para TODAS
+                        let px = startX + x + (Math.random() - 0.5)*15;
+                        let py = startY - y + (Math.random() - 0.5)*15;
+                        let pz = (Math.random() - 0.5) * 80;
+
+                        // Matemáticas Ancla
+                        let bx = startX + x;
+                        let by = startY - y;
+                        let bz = 0; 
+
+                        // Propulsores biológicos (angle, pulse, lazy, fuzz, dens)
+                        let ang = Math.random() * Math.PI * 2;
+                        let pulseS = Math.random() * 0.05 + 0.02;
+                        let lazy = Math.random() > 0.6 ? 1 : 0; // 60% rápidas, 40% procedurales lentas
+                        let fuzz = (Math.random() * 60) - 30;
+                        let dens = (Math.random() * 20) + 2;
+
+                        let pData = {
+                            pos: [px, py, pz], base: [bx, by, bz], rgb: [r/255, g/255, b/255], meta: [ang, pulseS, lazy, fuzz, dens]
+                        };
+
+                        if (isDark) darkArray.push(pData);
+                        else neonArray.push(pData);
+                    }
+                }
+            }
+
+            // Inyectar a buffers WebGL
+            buildParticleCloud(neonArray, false);
+            buildParticleCloud(darkArray, true);
+        }
+
+        // Compilar Nube de Puntos (Point Clouds)
+        function buildParticleCloud(arr, isDark) {
+            const count = arr.length;
+            if (count === 0) return;
+
+            const geometry = new THREE.BufferGeometry();
+            const positions = new Float32Array(count * 3);
+            const basePos = new Float32Array(count * 3);
+            const colors = new Float32Array(count * 3);
+            const velocities = new Float32Array(count * 3);
+            const metaInfo = new Float32Array(count * 5); 
+
+            for(let i=0; i<count; i++) {
+                let item = arr[i];
+                positions[i*3] = item.pos[0]; positions[i*3+1] = item.pos[1]; positions[i*3+2] = item.pos[2];
+                basePos[i*3] = item.base[0]; basePos[i*3+1] = item.base[1]; basePos[i*3+2] = item.base[2];
+                colors[i*3] = item.rgb[0]; colors[i*3+1] = item.rgb[1]; colors[i*3+2] = item.rgb[2];
+                metaInfo[i*5] = item.meta[0]; metaInfo[i*5+1] = item.meta[1]; metaInfo[i*5+2] = item.meta[2];
+                metaInfo[i*5+3] = item.meta[3]; metaInfo[i*5+4] = item.meta[4];
+            }
+
+            geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+            if(isDark) {
+                // Modo Rostro: Colores normales (Eclipsa la luz subyacente)
+                const mat = new THREE.PointsMaterial({
+                    size: 1.8, vertexColors: true, transparent: true, opacity: 0.95, blending: THREE.NormalBlending
+                });
+                darkGeometry = geometry;
+                darkPoints = new THREE.Points(geometry, mat);
+                darkBasePos = basePos; darkCurrentPos = positions; darkVelocities = velocities; darkData = metaInfo;
+                scene.add(darkPoints);
+            } else {
+                // Modo Luciérnagas: Material emisivo falso (Bloom aditivo)
+                const mat = new THREE.PointsMaterial({
+                    size: 1.8, vertexColors: true, transparent: true, opacity: 0.85, blending: THREE.NormalBlending, depthWrite: false
+                });
+                neonGeometry = geometry;
+                neonPoints = new THREE.Points(geometry, mat);
+                neonBasePos = basePos; neonCurrentPos = positions; neonVelocities = velocities; neonData = metaInfo;
+                scene.add(neonPoints);
+            }
+        }
+
+        // Loop principal del procesador
+        function animateWebGL() {
+            requestAnimationFrame(animateWebGL);
+
+            const time = Date.now() * 0.0015;
+            const swayAngle = Math.sin(time) * 0.05;
+
+            // Procesamos matemáticas en CPU por iteración de Float32Arrays masivos
+            if(neonPoints) updatePhysics(neonCurrentPos, neonBasePos, neonVelocities, neonData, time, swayAngle, false, neonGeometry);
+            if(darkPoints) updatePhysics(darkCurrentPos, darkBasePos, darkVelocities, darkData, time, swayAngle, true, darkGeometry);
+
+            renderer.render(scene, camera);
+        }
+
+        function updatePhysics(positions, bases, velocities, data, time, swayAngle, isDark, geometry) {
+            const count = positions.length / 3;
+            const pivotX = 0; 
+            const pivotY = -window.innerHeight / 2 - 100; // Eje de rotación ficticio abajo de pantalla
+
+            for(let i=0; i<count; i++) {
+                let px = positions[i*3], py = positions[i*3+1], pz = positions[i*3+2];
+                let bx = bases[i*3], by = bases[i*3+1], bz = bases[i*3+2];
+                
+                // Matematica Péndular global para anclar todo coherentemente
+                let dxR = bx - pivotX;
+                let dyR = by - pivotY;
+                let targetX = pivotX + dxR * Math.cos(swayAngle) - dyR * Math.sin(swayAngle);
+                let targetY = pivotY + dxR * Math.sin(swayAngle) + dyR * Math.cos(swayAngle);
+                targetY += Math.sin(time * 2) * 4; // Respiración Vertical Unificada
+                let targetZ = 0; 
+
+                let inExplosion = isExploding && (Date.now() - explosionTime < 7000);
+
+                if (inExplosion) {
+                    velocities[i*3] *= 0.97;
+                    velocities[i*3+1] *= 0.97;
+                    velocities[i*3+2] *= 0.97;
+
+                    px += velocities[i*3];
+                    py += velocities[i*3+1];
+                    pz += velocities[i*3+2];
+
+                    // Reconstrucción gradual después de 2s
+                    let elapsed = Date.now() - explosionTime;
+                    if (elapsed > 2000) {
+                        let rebuilding = Math.min((elapsed - 2000) / 5000, 1);
+                        let pullStrength = 0.005 + rebuilding * 0.04;
+                        px += (targetX - px) * pullStrength;
+                        py += (targetY - py) * pullStrength;
+                        pz += (targetZ - pz) * pullStrength;
+                    }
+                }
+
+                // Ratón SIEMPRE activo (durante y después de explosión)
+                let dxM = mouseObj.x - px;
+                let dyM = mouseObj.y - py;
+                let distM = Math.sqrt(dxM*dxM + dyM*dyM);
+                let fuzz = data[i*5+3];
+                let rad = maxOrganicRadius + fuzz;
+
+                if (distM < rad) {
+                    let linearForce = (rad - distM) / rad;
+                    let force = linearForce * linearForce;
+                    
+                    let lazy = data[i*5+2];
+                    let dens = data[i*5+4];
+                    let esc = lazy ? 0.015 : 1;
+
+                    px -= (dxM/distM) * force * dens * esc;
+                    py -= (dyM/distM) * force * dens * esc;
+                    pz += (Math.random()-0.5) * force * 15 * esc;
+                } else if (!inExplosion) {
+                    // Retorno elástico solo cuando NO hay explosión activa
+                    px += (targetX - px) * 0.1;
+                    py += (targetY - py) * 0.1;
+                    pz += (targetZ - pz) * 0.1;
+                }
+
+                // Micromovimiento sutil para todas
+                data[i*5] += data[i*5+1]; 
+                px += Math.sin(data[i*5]) * 0.2;
+                py += Math.cos(data[i*5]*0.8) * 0.2;
+
+                positions[i*3] = px; positions[i*3+1] = py; positions[i*3+2] = pz;
+            }
+
+            // Flag crítica de Buffer de Tres.js para actualizar colores y vértices
+            geometry.attributes.position.needsUpdate = true;
+        }
+
+        // --- ARRANQUE GLOBAL ---
+        initWebGL();
+        animateWebGL();
+
+        // =================== SISTEMA DE CARGA DE IMAGEN ===================
+        const welcomeScreen = document.getElementById('welcomeScreen');
+        const dropZone = document.getElementById('dropZone');
+        const imagePreview = document.getElementById('imagePreview');
+        const btnStart = document.getElementById('btnStart');
+        const btnChangeImage = document.getElementById('btnChangeImage');
+        const hiddenFileInput = document.getElementById('hiddenFileInput');
+
+        let pendingImageDataURL = null;
+
+        // Crear partículas decorativas en la pantalla de bienvenida
+        (function spawnBgParticles() {
+            for (let i = 0; i < 40; i++) {
+                const p = document.createElement('div');
+                p.className = 'bg-particle';
+                p.style.left = Math.random() * 100 + 'vw';
+                p.style.top = (80 + Math.random() * 40) + 'vh';
+                p.style.animationDuration = (6 + Math.random() * 10) + 's';
+                p.style.animationDelay = (Math.random() * 8) + 's';
+                p.style.width = p.style.height = (2 + Math.random() * 3) + 'px';
+                p.style.background = `hsl(${280 + Math.random()*60}, 70%, ${60 + Math.random()*30}%)`;
+                welcomeScreen.appendChild(p);
+            }
+        })();
+
+        // Procesar archivo de imagen seleccionado
+        function handleImageFile(file) {
+            if (!file || !file.type.startsWith('image/')) return;
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                pendingImageDataURL = e.target.result;
+                imagePreview.src = pendingImageDataURL;
+                imagePreview.classList.add('visible');
+                btnStart.classList.add('visible');
+            };
+            reader.readAsDataURL(file);
+        }
+
+        // Cargar imagen y arrancar partículas
+        function startWithImage(dataURL) {
+            sourceImage.onload = () => {
+                imageLoaded = true;
+                loadParticlesFromImage();
+                welcomeScreen.classList.add('hidden');
+                document.getElementById('rightControls').classList.add('visible');
+            };
+            sourceImage.onerror = () => {
+                alert('⚠️ Error al cargar la imagen. Intenta con otra.');
+            };
+            sourceImage.src = dataURL;
+        }
+
+        // Checkbox: regenerar partículas si el usuario cambia el estado del fondo en vivo
+        document.getElementById('chkRemoveBgFloat').addEventListener('change', () => {
+            if (imageLoaded) loadParticlesFromImage();
+        });
+
+        // Click en drop zone → abrir selector de archivo
+        dropZone.addEventListener('click', () => hiddenFileInput.click());
+
+        // Drag & Drop
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('dragover');
+        });
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            if (e.dataTransfer.files.length > 0) {
+                handleImageFile(e.dataTransfer.files[0]);
+            }
+        });
+
+        // Input file change
+        hiddenFileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleImageFile(e.target.files[0]);
+            }
+        });
+
+        // Botón de iniciar
+        btnStart.addEventListener('click', () => {
+            if (pendingImageDataURL) {
+                startWithImage(pendingImageDataURL);
+            }
+        });
+
+        // Botón flotante: cambiar imagen en cualquier momento
+        btnChangeImage.addEventListener('click', () => {
+            hiddenFileInput.value = ''; // Reset para permitir re-selección
+            hiddenFileInput.click();
+        });
+
+        // Listener especial: si ya estamos en modo partículas y se cambia la imagen
+        hiddenFileInput.addEventListener('change', function reloadHandler(e) {
+            if (!welcomeScreen.classList.contains('hidden')) return; // La welcome screen maneja esto
+            if (e.target.files.length > 0) {
+                const file = e.target.files[0];
+                if (!file.type.startsWith('image/')) return;
+                const reader = new FileReader();
+                reader.onload = (ev) => {
+                    startWithImage(ev.target.result);
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+    </script>
+</body>
+</html>
